@@ -53,7 +53,7 @@ struct Edge{
 };
 
 
-int alg_Boruvki(set<Edge>& edges, int n, int m) {
+int alg_Boruvki(set<Edge>& edges, int n, int m, vector<bool>& view) {
     int WEIGHT = 0;
     int comps = n;
 
@@ -68,7 +68,7 @@ int alg_Boruvki(set<Edge>& edges, int n, int m) {
         AllComps.push_back(i);
     }
 
-    vector<pair<int,int>> minedges(n,pair<int,int>(INT_MAX,0));
+    vector<Edge> minedges(n,Edge(0,0,INT_MAX,0));
     //начало алгоритма
     while (comps > 1) {
         //cout << comps <<" "<<edges.size() <<'\n';
@@ -82,13 +82,11 @@ int alg_Boruvki(set<Edge>& edges, int n, int m) {
             int fromComp = components.find_set(curEdge.from);
             int toComp = components.find_set(curEdge.to);
             if (fromComp != toComp ) {
-                if(curEdge.weight < minedges[fromComp].first){
-                    minedges[fromComp].first = curEdge.weight;
-                    minedges[fromComp].second = curEdge.to;
+                if(curEdge.weight < minedges[fromComp].weight){
+                    minedges[fromComp] = Edge(curEdge.from,curEdge.to,curEdge.weight,0);
                 }
-                if(curEdge.weight < minedges[toComp].first){
-                    minedges[toComp].first = curEdge.weight;
-                    minedges[toComp].second = curEdge.from;
+                if(curEdge.weight < minedges[toComp].weight){
+                    minedges[toComp] = Edge(curEdge.to,curEdge.from,curEdge.weight,0);
                 }
             }
         }
@@ -101,19 +99,22 @@ int alg_Boruvki(set<Edge>& edges, int n, int m) {
             int curComp = AllComps[j];
             int new_comp;
 
-            if(minedges[curComp].first!=INT_MAX && curComp!=-1) {
-                int to = minedges[curComp].second;
+            if(minedges[curComp].weight!=INT_MAX && curComp!=-1) {
+                int to = minedges[curComp].to;
                 int otherComp = components.find_set(to);
-                WEIGHT += minedges[curComp].first;
+                WEIGHT += minedges[curComp].weight;
+                view[minedges[curComp].from] = !view[minedges[curComp].from];
+                view[minedges[curComp].to] = !view[minedges[curComp].to];
 
-                if (components.find_set(minedges[otherComp].second) == curComp) {
+
+                if (components.find_set(minedges[otherComp].to) == curComp) {
                     components.union_sets(curComp, to);
 
                     new_comp = components.find_set(to);
-                    minedges[new_comp].first = INT_MAX;
+                    minedges[new_comp].weight = INT_MAX;
 
                 } else {
-                    pair<int, int> tmp = minedges[otherComp];
+                    Edge tmp = minedges[otherComp];
                     components.union_sets(curComp, to);
                     new_comp = components.find_set(to);
                     minedges[new_comp] = tmp;
@@ -169,8 +170,8 @@ bool NextSet(int *a, int n)
     return true;
 }
 
-int real_distance(set<Edge>& in, int n){
-    vector<vector<int>> matrix(n, vector<int>(n, INT_MAX));
+int real_distance(vector<vector<int>>& matrix, set<Edge>& in, int n){
+
     for(auto i = in.begin(); i != in.end(); i++){
         matrix[i->from][i->to] = i->weight;
         matrix[i->to][i->from] = i->weight;
@@ -196,7 +197,29 @@ int real_distance(set<Edge>& in, int n){
         if(min > dist) min = dist;
     }while(NextSet(var, n));
 
+    delete [] var;
+
     return min;
+}
+
+
+int alg_Euler(vector<vector<int>>& matrix, set<Edge>& in, vector<bool>& view){
+    in.clear(); int k = 0; int sum = 0;
+    for(int i = 0; i < matrix.size(); i++){
+        for(int j = i + 1; j < matrix.size(); j++){
+            in.insert(Edge(i, j, matrix[i][j], k++));
+        }
+    }
+
+    for(auto i = in.begin(); i != in.end(); i++){
+        Edge tmp = *i;
+        if(!view[tmp.from] && !view[tmp.to]){
+            view[tmp.from] = true;
+            view[tmp.to] = true;
+            sum += tmp.weight;
+        }
+    }
+    return sum;
 }
 
 int main(){
@@ -205,11 +228,19 @@ int main(){
     set<Edge> in;
     for(int i = 0; i < m; i++){
         cin >> a >> b >> c;
-        in.insert(Edge(a, b, c, i));
+        in.insert(Edge(a-1, b-1, c, i));
     }
 
-    cout << "Real min path : " << real_distance(in, n) << "\n";
-    cout << "MST : " << alg_Boruvki(in, n, m) * 2;
+    vector<bool> view(n,true);
+    vector<vector<int>> matrix(n, vector<int>(n, INT_MAX));
+
+    int real = real_distance(matrix, in, n);
+    int mst_2 = alg_Boruvki(in, n, m, view);
+    int mst_euler = alg_Euler(matrix, in, view);
+
+    cout << "Real min path : " << real << "\n";
+    cout << "MST : " << mst_2 * 2 << "\n";
+    cout << "MST + Euler cycle : " << mst_euler + mst_2 << "\n";
 
     return 0;
 }
